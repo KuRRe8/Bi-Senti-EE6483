@@ -6,6 +6,10 @@
   Yang Kaiwen, Li Siqi, Zheng Zhikai
 </h4>
 
+<h4 align="center">
+  This is a private project for EE6483 Binary Sentiment Analysis
+</h4>
+
 <div align="center">
   <a href="https://github.com/KuRRe8/Bi-Senti-EE6483"><img src="https://img.shields.io/conda/pn/conda-forge/labelme?color=green&label=Bi-Senti-EE6483"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.9%7C3.10%7C3.11%7C3.12-lightblue"></a>
@@ -16,7 +20,8 @@
 <div align="center">
     <a href="#file-description"><b>File description</b></a> |
     <a href="#usage"><b>usage</b></a> |
-    <a href="#discussion"><b>discussion</b></a>
+    <a href="#discussion"><b>discussion</b></a> |
+    <a href="#code-of-conduct"><b>code of conduct</b></a>
 </div>
 
 ## File description
@@ -33,9 +38,14 @@
   
 ## usage
 
-In your conda env:
+In your conda distribution(anaconda/ miniconda/ miniforge):
 ```cmd
->python
+> conda activate <env_name>
+> pip install -r ./config/requirements.txt # alternatively, you can use conda install --file ./config/requirements.txt
+```
+**Be note that you'd better run in this way, to avoid path issues in the code:**
+```cmd
+> python app.py
 ```
 press <kbd>CTRL</kbd> + <kbd>C</kbd> to stop the program
 
@@ -46,4 +56,7 @@ please refer to <https://github.com/KuRRe8/Bi-Senti-EE6483/discussions> for furt
 ## code of conduct
 
 Do not push -f
+
 Rebase or squash if you like
+
+This project is designed to be a private repository, please do not fork or clone without permission.

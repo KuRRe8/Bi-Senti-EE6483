@@ -1,0 +1,14 @@
+pandas
+scikit-learn
+nltk
+spacy
+gensim
+matplotlib
+seaborn
+skelm
+keras
+pytorch
+transformers
+datasets
+evaluate
+jupyter
