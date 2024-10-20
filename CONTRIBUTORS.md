@@ -11,13 +11,13 @@ We would like to thank the following individuals for their contributions to this
 ## Li Siqi
 
 - **Role**: Developer
-- **GitHub**: [Li](https://github.com/)
+- **GitHub**: [LISI0037](https://github.com/LISI0037)
 - **Email**: <LISI0037@e.ntu.edu.sg>
 
 ## Zheng Zhikai
 
 - **Role**: Developer
-- **GitHub**: [Zheng](https://github.com/)
+- **GitHub**: [yuicheng](https://github.com/yuicheng)
 - **Email**: <zzheng014@e.ntu.edu.sg>
 
 Thank you to all our contributors for their hard work and dedication!
