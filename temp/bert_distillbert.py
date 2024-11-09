@@ -62,7 +62,7 @@ def objective(trial: optuna.Trial):
     
     # 训练参数
     training_args = TrainingArguments(
-        output_dir=os.path.join('log', f"trial_bert_{trial.number}"),
+        output_dir=os.path.join('log', f"trial_distillbert_{trial.number}"),
         evaluation_strategy="epoch",
         save_strategy="epoch",
         learning_rate=hyperparameters["learning_rate"],
@@ -74,7 +74,7 @@ def objective(trial: optuna.Trial):
     
     # 初始化模型
     model = AutoModelForSequenceClassification.from_pretrained(
-        "bert-base-cased", 
+        "distilbert-base-cased", 
         num_labels=2
     )
     
@@ -95,51 +95,14 @@ def objective(trial: optuna.Trial):
     
     return eval_result["eval_accuracy"]
 
-def load_and_predict(text: str, model_path: str):
-    # 1. 加载模型和tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_path)
-    
-    # 2. 将模型移至GPU（如果可用）
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
-    model.eval()  # 设置为评估模式
-    
-    # 3. 预处理输入文本
-    inputs = tokenizer(
-        text,
-        padding="max_length",
-        truncation=True,
-        max_length=128,
-        return_tensors="pt"
-    )
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    
-    # 4. 推理
-    with torch.no_grad():
-        outputs = model(**inputs)
-        predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
-        predicted_class = torch.argmax(predictions, dim=-1).item()
-        confidence = predictions[0][predicted_class].item()
-    
-    # 5. 返回结果（0表示负面，1表示正面）
-    sentiment = "positive" if predicted_class == 1 else "negative"
-    return {"sentiment": sentiment, "confidence": confidence}
-
-theview = 'I love naughty monkey! Im so happy with their shoes! They dont hurt my feet'
 def main():
-    if os.path.exists(os.path.join('checkpoint', 'bert', 'final_model')):
-        print(load_and_predict(theview,os.path.join('checkpoint', 'bert', 'final_model')))
-        return
-    
     # 1. 加载数据
     print("1. 加载数据")
     train_dataset, test_dataset = load_custom_dataset(os.path.join('data', 'train.json'))
     
-
     # 2. 初始化tokenizer
     print("2. 初始化tokenizer")
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased")
     
     # 3. 数据预处理
     print("3. 数据预处理")
@@ -167,7 +130,7 @@ def main():
     # 6. 使用最佳参数训练最终模型
     print("6. 使用最佳参数训练最终模型")
     final_training_args = TrainingArguments(
-        output_dir=os.path.join('checkpoint', 'bert'),
+        output_dir=os.path.join('checkpoint', 'distllbert'),
         learning_rate=best_params["learning_rate"],
         per_device_train_batch_size=best_params["per_device_train_batch_size"],
         num_train_epochs=best_params["num_train_epochs"],
@@ -177,7 +140,7 @@ def main():
     )
     
     final_model = AutoModelForSequenceClassification.from_pretrained(
-        "bert-base-cased", 
+        "distilbert-base-cased", 
         num_labels=2
     )
     
@@ -200,7 +163,7 @@ def main():
     
     # 保存最终模型
     print("保存最终模型")
-    final_model_path = os.path.join('checkpoint', 'bert', 'final_model')
+    final_model_path = os.path.join('checkpoint', 'distillbert', 'final_model')
     final_trainer.save_model(final_model_path)
     tokenizer.save_pretrained(final_model_path)
 
