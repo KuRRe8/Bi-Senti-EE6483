@@ -5,10 +5,14 @@ spacy
 gensim
 matplotlib
 seaborn
-skelm
+scikit-elm
 keras
 pytorch
 transformers
 datasets
 evaluate
+accelerate
+optuna
+ray[tune]
 jupyter
+textblob
