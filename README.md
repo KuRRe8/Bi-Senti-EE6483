@@ -34,6 +34,7 @@
 - [x] [config](/config/)-->Configuration files
 - [x] [submit](/submit/)-->Submission files
 - [x] [README](/README.md)-->Readme file
+- [x] [checkpoint](/checkpoint/)-->Model checkpoints
 - [x] [temp*](/temp/)-->Temporary files
   
 ## usage

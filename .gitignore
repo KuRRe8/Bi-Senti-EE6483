@@ -162,5 +162,11 @@ cython_debug/
 #.idea/
 
 #temp/
-**/cifar*
+**/cifar*/
 .gradio/
+.vscode/
+GoogleNews-vectors-negative300.bin
+checkpoint/
+**/optuna*/
+log/
+cifar-10-python.tar.gz
