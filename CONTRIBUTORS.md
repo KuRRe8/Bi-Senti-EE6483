@@ -4,7 +4,7 @@ We would like to thank the following individuals for their contributions to this
 
 ## Yang Kaiwen
 
-- **Role**: Project Lead
+- **Role**: Project Leader
 - **GitHub**: [KuRRe8](https://github.com/KuRRe8)
 - **Email**: <yang0886@e.ntu.edu.sg>
 

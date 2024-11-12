@@ -320,6 +320,8 @@ if 5:
     from ray.tune.schedulers import ASHAScheduler
 
     global_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pad_to_length = 50
+
 
     class myRNN(nn.Module):
         def __init__(self, input_size, hidden_size, output_size, num_layers=1):
@@ -647,25 +649,25 @@ if 5:
             import optuna
 
             def train_RNN(config: Dict[str, float]):
-                X_train, X_test, y_train, y_test = train_test_split(train_test_data['reviews'], train_test_data['sentiment'], test_size=0.2, random_state=42)
-                X_train = torch.tensor(X_train.to_numpy()).to(global_device)
-                y_train = torch.tensor(y_train.to_numpy()).to(global_device)
-                X_test = torch.tensor(X_test.to_numpy()).to(global_device)
-                y_test = torch.tensor(y_test.to_numpy()).to(global_device)
-                train_dataset = TensorDataset(X_train, y_train)
+                X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+                X_train_t = torch.tensor(X_train).to(global_device)
+                y_train_t = torch.tensor(y_train).to(global_device)
+                X_test_t = torch.tensor(X_test).to(global_device)
+                y_test_t = torch.tensor(y_test).to(global_device)
+                train_dataset = TensorDataset(X_train_t, y_train_t)
                 train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
-                model = myRNN(input_size=X_train.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
+                model = myRNN(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
                 criterion = nn.BCEWithLogitsLoss().to(global_device)
                 optimizer = Adam(model.parameters(), lr=config['lr'])
                 while True: # let train.RunConfig.stop determine when to stop, each iter is one epoch
                     for i, (X , y) in enumerate(train_loader):
                         optimizer.zero_grad()
-                        y_pred = model(X.float())
-                        loss = criterion(y_pred, y.float().view(-1, 1))
+                        y_pred_t = model(X.float())
+                        loss = criterion(y_pred_t, y.float().view(-1, 1))
                         loss.backward()
                         optimizer.step()
-                    y_pred = model(X_test.float())
-                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred]
+                    y_pred_t = model(X_test_t.float())
+                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
                     accuracy = accuracy_score(y_test, y_pred)
                     train.report({"acc_report": accuracy})
             search_space = {
@@ -685,9 +687,9 @@ if 5:
                 ),
                 run_config=train.RunConfig(
                     name='rnn_tuner',
-                    storage_path=os.path.join(os.getcwd(),'log', 'optuna_storage'),
-                    stop={"training_iteration": 100,
-                        "acc_report": 0.95},
+                    storage_path=os.path.join('log', 'optuna_storage'),
+                    stop={"training_iteration": 500,
+                        "acc_report": 0.98},
                 ),
                 param_space=search_space,
             )
@@ -695,7 +697,36 @@ if 5:
             print("Best config is:", results.get_best_result().config)
 
             # train agian with the best config
-            pass
+            config = results.get_best_result().config
+            X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+            X_train_t = torch.tensor(X_train).to(global_device)
+            y_train_t = torch.tensor(y_train).to(global_device)
+            X_test_t = torch.tensor(X_test).to(global_device)
+            y_test_t = torch.tensor(y_test).to(global_device)
+            train_dataset = TensorDataset(X_train_t, y_train_t)
+            train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+            model = myRNN(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
+            criterion = nn.BCEWithLogitsLoss().to(global_device)
+            optimizer = Adam(model.parameters(), lr=config['lr'])
+            for _ in range(500):
+                for i, (X , y) in enumerate(train_loader):
+                    optimizer.zero_grad()
+                    y_pred_t = model(X.float())
+                    loss = criterion(y_pred_t, y.float().view(-1, 1))
+                    loss.backward()
+                    optimizer.step()
+                y_pred_t = model(X_test_t.float())
+                y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+                print(f'in epoch {_}, accuracy = {accuracy_score(y_test, y_pred)}')
+            y_pred_t = model(X_test.float())
+            y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+            print(f'final, accuracy = {accuracy_score(y_test, y_pred)}')
+            getConfMatrix(y_pred, y_test)
+
+            output_t = model(torch.tensor(pred_data).to(global_device).float())
+            output = [1 if pred > 0.5 else 0 for pred in output_t]
+            s = pd.Series(output)
+            return s
 
         elif method == 'LSTM':
             from sklearn.model_selection import train_test_split
@@ -709,25 +740,25 @@ if 5:
             import optuna
 
             def train_LSTM(config: Dict[str, float]):
-                X_train, X_test, y_train, y_test = train_test_split(train_test_data['reviews'], train_test_data['sentiment'], test_size=0.2, random_state=42)
-                X_train = torch.tensor(X_train.to_numpy()).to(global_device)
-                y_train = torch.tensor(y_train.to_numpy()).to(global_device)
-                X_test = torch.tensor(X_test.to_numpy()).to(global_device)
-                y_test = torch.tensor(y_test.to_numpy()).to(global_device)
-                train_dataset = TensorDataset(X_train, y_train)
+                X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+                X_train_t = torch.tensor(X_train).to(global_device)
+                y_train_t = torch.tensor(y_train).to(global_device)
+                X_test_t = torch.tensor(X_test).to(global_device)
+                y_test_t = torch.tensor(y_test).to(global_device)
+                train_dataset = TensorDataset(X_train_t, y_train_t)
                 train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
-                model = myLSTM(input_size=X_train.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
+                model = myLSTM(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
                 criterion = nn.BCEWithLogitsLoss().to(global_device)
                 optimizer = Adam(model.parameters(), lr=config['lr'])
                 while True: # let train.RunConfig.stop determine when to stop, each iter is one epoch
-                    for i, (X , y) in enumerate(train_loader): # one batch
+                    for i, (X , y) in enumerate(train_loader):
                         optimizer.zero_grad()
-                        y_pred = model(X.float())
-                        loss = criterion(y_pred, y.float().view(-1, 1))
+                        y_pred_t = model(X.float())
+                        loss = criterion(y_pred_t, y.float().view(-1, 1))
                         loss.backward()
                         optimizer.step()
-                    y_pred = model(X_test.float())
-                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred]
+                    y_pred_t = model(X_test_t.float())
+                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
                     accuracy = accuracy_score(y_test, y_pred)
                     train.report({"acc_report": accuracy})
             search_space = {
@@ -747,9 +778,9 @@ if 5:
                 ),
                 run_config=train.RunConfig(
                     name='lstm_tuner',
-                    storage_path=os.path.join(os.getcwd(),'log', 'optuna_storage'),
-                    stop={"training_iteration": 333,
-                        "acc_report": 0.95},
+                    storage_path=os.path.join('log', 'optuna_storage'),
+                    stop={"training_iteration": 500,
+                        "acc_report": 0.98},
                 ),
                 param_space=search_space,
             )
@@ -757,8 +788,36 @@ if 5:
             print("Best config is:", results.get_best_result().config)
 
             # train agian with the best config
-            pass
+            config = results.get_best_result().config
+            X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+            X_train_t = torch.tensor(X_train).to(global_device)
+            y_train_t = torch.tensor(y_train).to(global_device)
+            X_test_t = torch.tensor(X_test).to(global_device)
+            y_test_t = torch.tensor(y_test).to(global_device)
+            train_dataset = TensorDataset(X_train_t, y_train_t)
+            train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+            model = myLSTM(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
+            criterion = nn.BCEWithLogitsLoss().to(global_device)
+            optimizer = Adam(model.parameters(), lr=config['lr'])
+            for _ in range(500):
+                for i, (X , y) in enumerate(train_loader):
+                    optimizer.zero_grad()
+                    y_pred_t = model(X.float())
+                    loss = criterion(y_pred_t, y.float().view(-1, 1))
+                    loss.backward()
+                    optimizer.step()
+                y_pred_t = model(X_test_t.float())
+                y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+                print(f'in epoch {_}, accuracy = {accuracy_score(y_test, y_pred)}')
+            y_pred_t = model(X_test_t.float())
+            y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+            print(f'final, accuracy = {accuracy_score(y_test, y_pred)}')
+            getConfMatrix(y_pred, y_test)
 
+            output_t = model(torch.tensor(pred_data).to(global_device).float())
+            output = [1 if pred > 0.5 else 0 for pred in output_t]
+            s = pd.Series(output)
+            return s
         elif method == 'GRU':
             from sklearn.model_selection import train_test_split
             from sklearn.metrics import accuracy_score
@@ -771,32 +830,31 @@ if 5:
             import optuna
 
             def train_GRU(config: Dict[str, float]):
-                X_train, X_test, y_train, y_test = train_test_split(train_test_data['reviews'], train_test_data['sentiment'], test_size=0.2, random_state=42)
-                X_train = torch.tensor(X_train.to_numpy()).to(global_device)
-                y_train = torch.tensor(y_train.to_numpy()).to(global_device)
-                X_test = torch.tensor(X_test.to_numpy()).to(global_device)
-                y_test = torch.tensor(y_test.to_numpy()).to(global_device)
-                train_dataset = TensorDataset(X_train, y_train)
+                X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+                X_train_t = torch.tensor(X_train).to(global_device)
+                y_train_t = torch.tensor(y_train).to(global_device)
+                X_test_t = torch.tensor(X_test).to(global_device)
+                y_test_t = torch.tensor(y_test).to(global_device)
+                train_dataset = TensorDataset(X_train_t, y_train_t)
                 train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
-                model = myGRU(input_size=X_train.shape[2], hidden_size=config['hidden_size'], output_size=1, bidirectional=config['bidirectional']).to(global_device)
+                model = myGRU(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
                 criterion = nn.BCEWithLogitsLoss().to(global_device)
                 optimizer = Adam(model.parameters(), lr=config['lr'])
                 while True: # let train.RunConfig.stop determine when to stop, each iter is one epoch
-                    for i, (X , y) in enumerate(train_loader): # one batch
+                    for i, (X , y) in enumerate(train_loader):
                         optimizer.zero_grad()
-                        y_pred = model(X.float())
-                        loss = criterion(y_pred, y.float().view(-1, 1))
+                        y_pred_t = model(X.float())
+                        loss = criterion(y_pred_t, y.float().view(-1, 1))
                         loss.backward()
                         optimizer.step()
-                    y_pred = model(X_test.float())
-                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred]
+                    y_pred_t = model(X_test_t.float())
+                    y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
                     accuracy = accuracy_score(y_test, y_pred)
                     train.report({"acc_report": accuracy})
             search_space = {
                 'hidden_size': tune.randint(50, 200),
                 'lr': tune.loguniform(1e-4, 1e-1),
-                'batch_size': tune.choice([32, 64, 128]),
-                'bidirectional': tune.choice([True, False])
+                'batch_size': tune.choice([32, 64, 128])
             }
 
             algo = OptunaSearch()
@@ -810,9 +868,9 @@ if 5:
                 ),
                 run_config=train.RunConfig(
                     name='gru_tuner',
-                    storage_path=os.path.join(os.getcwd(),'log', 'optuna_storage'),
-                    stop={"training_iteration": 333,
-                        "acc_report": 0.95},
+                    storage_path=os.path.join('log', 'optuna_storage'),
+                    stop={"training_iteration": 500,
+                        "acc_report": 0.98},
                 ),
                 param_space=search_space,
             )
@@ -820,8 +878,37 @@ if 5:
             print("Best config is:", results.get_best_result().config)
 
             # train agian with the best config
-            pass
+            config = results.get_best_result().config
+            X_train, X_test, y_train, y_test = train_test_split(train_test_data, train_test_label, test_size=0.2, random_state=42)
+            X_train_t = torch.tensor(X_train).to(global_device)
+            y_train_t = torch.tensor(y_train).to(global_device)
+            X_test_t = torch.tensor(X_test).to(global_device)
+            y_test_t = torch.tensor(y_test).to(global_device)
+            train_dataset = TensorDataset(X_train_t, y_train_t)
+            train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+            model = myGRU(input_size=X_train_t.shape[2], hidden_size=config['hidden_size'], output_size=1).to(global_device)
+            criterion = nn.BCEWithLogitsLoss().to(global_device)
+            optimizer = Adam(model.parameters(), lr=config['lr'])
+            for _ in range(500):
+                for i, (X , y) in enumerate(train_loader):
+                    optimizer.zero_grad()
+                    y_pred_t = model(X.float())
+                    loss = criterion(y_pred_t, y.float().view(-1, 1))
+                    loss.backward()
+                    optimizer.step()
+                y_pred_t = model(X_test_t.float())
+                y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+                print(f'in epoch {_}, accuracy = {accuracy_score(y_test, y_pred)}')
+            y_pred_t = model(X_test.float())
+            y_pred = [1 if pred > 0.5 else 0 for pred in y_pred_t]
+            print(f'final, accuracy = {accuracy_score(y_test, y_pred)}')
+            getConfMatrix(y_pred, y_test)
 
+            output_t = model(torch.tensor(pred_data).to(global_device).float())
+            output = [1 if pred > 0.5 else 0 for pred in output_t]
+            s = pd.Series(output)
+            return s
+            
         elif method == 'BERT' or method == "DistilBert" or method == "Roberta":
             if method == 'BERT':
                 PRETRAIN_HF_NAME = 'bert-base-cased'
@@ -833,7 +920,186 @@ if 5:
                 PRETRAIN_HF_NAME = 'roberta-base'
                 FINETUNED = 'roberta'
             
+            import os
+            import json
+            import numpy as np
+            from datasets import Dataset
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
+            import evaluate
+            from sklearn.model_selection import train_test_split
+            import optuna
+            import torch
+
+
+            def load_custom_dataset(train_data, train_label, pred_data):
+                train_texts, test_texts, train_labels, test_labels = train_test_split(train_data, train_label, test_size=0.2, random_state=42) 
+                train_dataset = Dataset.from_dict({
+                    "text": train_texts.tolist(),
+                    "label": train_labels.tolist()
+                })
+                
+                test_dataset = Dataset.from_dict({
+                    "text": test_texts.tolist(),
+                    "label": test_labels.tolist()
+                })
+                
+                pred_dataset = Dataset.from_dict({
+                    "text": pred_data.tolist()
+                })
+                return train_dataset, test_dataset, pred_dataset
             
+            def tokenize_function(examples, tokenizer):
+                return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
+            
+            metric = evaluate.load("accuracy")
+            def compute_metrics(eval_pred):
+                logits, labels = eval_pred
+                predictions = np.argmax(logits, axis=-1)
+                return metric.compute(predictions=predictions, references=labels)
+            
+            def objective(trial: optuna.Trial):
+                hyperparameters = {
+                    "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-4, log=True),
+                    "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [16]),
+                    "num_train_epochs": trial.suggest_int("num_train_epochs", 2, 5),
+                    "weight_decay": trial.suggest_float("weight_decay", 0.01, 0.1),
+                }
+                
+                training_args = TrainingArguments(
+                    output_dir=os.path.join('log', f"trial_{FINETUNED}_{trial.number}"),
+                    evaluation_strategy="epoch",
+                    save_strategy="epoch",
+                    learning_rate=hyperparameters["learning_rate"],
+                    per_device_train_batch_size=hyperparameters["per_device_train_batch_size"],
+                    num_train_epochs=hyperparameters["num_train_epochs"],
+                    weight_decay=hyperparameters["weight_decay"],
+                    load_best_model_at_end=True
+                )
+                
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    PRETRAIN_HF_NAME, 
+                    num_labels=2
+                )
+
+                trainer = Trainer(
+                    model=model,
+                    args=training_args,
+                    train_dataset=tokenized_train_dataset,
+                    eval_dataset=tokenized_test_dataset,
+                    compute_metrics=compute_metrics,
+                )
+                
+                trainer.train()
+                
+                eval_result = trainer.evaluate()
+                
+                return eval_result["eval_accuracy"]
+            
+
+            try_existing = os.path.join('checkpoint', FINETUNED, 'final_model')
+            if os.path.exists(try_existing):
+                loaded_model = AutoModelForSequenceClassification.from_pretrained(try_existing)
+                loaded_tokenizer = AutoTokenizer.from_pretrained(try_existing)
+
+                #保留前500个带标签数据用于测试
+                test_data_500 = train_test_data[:500]
+                test_label_500 = train_test_label[:500]
+                #pred_dataset
+
+
+                test_dataset_500 = Dataset.from_dict({
+                    "text": test_data_500.tolist(),
+                })
+
+                pred_dataset_all = Dataset.from_dict({
+                    "text": pred_data.tolist()
+                })
+
+                tokenized_test_dataset_fine = test_dataset_500.map(
+                    lambda x: tokenize_function(x, loaded_tokenizer),
+                    batched=True
+                )
+
+                tokenized_pred_dataset_fine = pred_dataset_all.map(
+                    lambda x: tokenize_function(x, loaded_tokenizer),
+                    batched=True
+                )
+                
+                inference_device = "cuda" if torch.cuda.is_available() else "cpu"
+                loaded_model = loaded_model.to(inference_device)
+                loaded_model.eval()
+                all_predictions= []
+
+                with torch.no_grad():
+                    outputs = loaded_model(**{k: v.to(loaded_model.device) for k, v in tokenized_pred_dataset.remove_columns(["text"]).items()})
+                    predictions = torch.softmax(outputs.logits, dim=-1)
+                    predicted_labels = torch.argmax(predictions, dim=-1)
+
+                    getConfMatrix(predicted_labels, train_test_label)
+
+                return
+
+            train_dataset, test_dataset, pred_dataset = load_custom_dataset(train_test_data, train_test_label, pred_data)
+            tokenizer = AutoTokenizer.from_pretrained(PRETRAIN_HF_NAME)
+            global tokenized_train_dataset, tokenized_test_dataset, tokenized_pred_dataset
+            tokenized_train_dataset = train_dataset.map(
+                lambda x: tokenize_function(x, tokenizer), 
+                batched=True
+            )
+            tokenized_test_dataset = test_dataset.map(
+                lambda x: tokenize_function(x, tokenizer), 
+                batched=True
+            )
+
+            study = optuna.create_study(direction="maximize")
+            study.optimize(objective, n_trials=10)
+
+            best_params = study.best_params
+            print(f"Best parameters: {best_params}")
+            print(f"Best accuracy: {study.best_value}")
+
+            final_training_args = TrainingArguments(
+                output_dir=os.path.join('checkpoint', FINETUNED),
+                learning_rate=best_params["learning_rate"],
+                per_device_train_batch_size=best_params["per_device_train_batch_size"],
+                num_train_epochs=best_params["num_train_epochs"],
+                weight_decay=best_params["weight_decay"],
+                save_strategy="epoch",
+                evaluation_strategy="epoch"
+            )
+            final_model = AutoModelForSequenceClassification.from_pretrained(
+                PRETRAIN_HF_NAME, 
+                num_labels=2
+            )
+            
+            final_trainer = Trainer(
+                model=final_model,
+                args=final_training_args,
+                train_dataset=tokenized_train_dataset,
+                eval_dataset=tokenized_test_dataset,
+                compute_metrics=compute_metrics,
+            )
+
+            final_trainer.train()
+            final_eval_result = final_trainer.evaluate()
+            print(f"Final test accuracy: {final_eval_result['eval_accuracy']}")
+            final_model_path = os.path.join('checkpoint', FINETUNED, 'my_final_model')
+            final_trainer.save_model(final_model_path)
+            tokenizer.save_pretrained(final_model_path)
+
+
+            # from now on, predict the unlabeled data 
+            tokenized_pred_dataset = pred_dataset.map(
+                lambda x: tokenize_function(x, tokenizer),
+                batched=True
+            )
+
+            predictions_logits = final_trainer.predict(tokenized_pred_dataset)
+            predictions = np.argmax(predictions_logits.predictions, axis=-1)
+
+            s = pd.Series(predictions)
+            return s
+
         elif method == 'costumized':
             raise NotImplementedError()
         else:
@@ -873,18 +1139,80 @@ if 5:
             output['sentiment'] = result
             output.to_csv(os.path.join('submit', 'out', 'GaussianProcess.csv'), index=False)
         elif taskflows[taski] & F.MODEL_RNN:
-            container_traintest[taski].append(model_train('RNN', container_traintest[taski][0], container_pred[taski][0]))
+            pad_len = pad_to_length
+            feature_size = len(container_traintest[taski][-1][0][0])
+
+            padded_train_test_data = np.zeros((len(container_traintest[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_traintest[taski][-1]):
+                padded_train_test_data[i, :len(sentence), :] = sentence
+            
+            # train_test_label will be used as is
+
+            padded_pred_data = np.zeros((len(container_pred[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_pred[taski][-1]):
+                padded_pred_data[i, :len(sentence), :] = sentence
+
+            result = model_train('RNN', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'RNN.csv'), index=False)
         elif taskflows[taski] & F.MODEL_LSTM:
-            container_traintest[taski].append(model_train('LSTM', container_traintest[taski][0], container_pred[taski][0]))
+            pad_len = pad_to_length
+            feature_size = len(container_traintest[taski][-1][0][0])
+
+            padded_train_test_data = np.zeros((len(container_traintest[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_traintest[taski][-1]):
+                padded_train_test_data[i, :len(sentence), :] = sentence
+            
+            # train_test_label will be used as is
+
+            padded_pred_data = np.zeros((len(container_pred[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_pred[taski][-1]):
+                padded_pred_data[i, :len(sentence), :] = sentence
+
+            result = model_train('LSTM', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'LSTM.csv'), index=False)
         elif taskflows[taski] & F.MODEL_GRU:
-            container_traintest[taski].append(model_train('GRU', container_traintest[taski][0], container_pred[taski][0]))
-        elif taskflows[taski] & F.MODEL_BERT:
-            container_traintest[taski].append(model_train('BERT', container_traintest[taski][0], container_pred[taski][0]))
-        elif taskflows[taski] & F.MODEL_DISTILBERT:
-            container_traintest[taski].append(model_train('DistilBert', container_traintest[taski][0], container_pred[taski][0]))
-        elif taskflows[taski] & F.MODEL_ROBERTA:
-            container_traintest[taski].append(model_train('Roberta', container_traintest[taski][0], container_pred[taski][0]))
-        elif taskflows[taski] & F.MODEL_COSTUMIZED:
+            pad_len = pad_to_length
+            feature_size = len(container_traintest[taski][-1][0][0])
+
+            padded_train_test_data = np.zeros((len(container_traintest[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_traintest[taski][-1]):
+                padded_train_test_data[i, :len(sentence), :] = sentence
+            
+            # train_test_label will be used as is
+
+            padded_pred_data = np.zeros((len(container_pred[taski][-1]), pad_len, feature_size))
+            for i, sentence in enumerate(container_pred[taski][-1]):
+                padded_pred_data[i, :len(sentence), :] = sentence
+
+            result = model_train('GRU', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'GRU.csv'), index=False)
+        
+# when fine-tuning, we pass through original data to huggingface api
+        elif taskflows[taski] & F.ENSEMBLE_BERT:
+            result = model_train('BERT', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'BERT.csv'), index=False)
+
+        elif taskflows[taski] & F.ENSEMBLE_DISTILBERT:
+            result = model_train('DistilBert', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'DistilBert.csv'), index=False)
+
+        elif taskflows[taski] & F.ENSEMBLE_ROBERTA:
+            result = model_train('Roberta', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            output: pd.DataFrame = container_pred[taski][0]
+            output['sentiment'] = result
+            output.to_csv(os.path.join('submit', 'out', 'Roberta.csv'), index=False)
+
+        elif taskflows[taski] & F.CUSTOMIZED:
             container_traintest[taski].append(model_train('costumized', container_traintest[taski][0], container_pred[taski][0]))
         else:
             pass
