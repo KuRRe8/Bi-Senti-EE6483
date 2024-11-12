@@ -12,9 +12,9 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score
 
 
-naame = 'roberta'
+naame = 'bert'
 
-prefix = '/home/users/ntu/yang0886/proj/Bi-Senti-EE6483/'
+prefix = 'D:\\_work\\Bi-Senti-EE6483\\'
 finetuned = os.path.join(prefix,'checkpoint',naame,'final_model')
 labeled_data = os.path.join(prefix,'data','train.json')
 unlabeled_data = os.path.join(prefix,'data','test.json')
