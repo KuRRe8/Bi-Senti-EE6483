@@ -1001,21 +1001,16 @@ if 5:
                 loaded_model = AutoModelForSequenceClassification.from_pretrained(try_existing)
                 loaded_tokenizer = AutoTokenizer.from_pretrained(try_existing)
 
-                #保留前500个带标签数据用于测试
-                test_data_500 = train_test_data[:500]
-                test_label_500 = train_test_label[:500]
-                #pred_dataset
 
-
-                test_dataset_500 = Dataset.from_dict({
-                    "text": test_data_500.tolist(),
+                get_score_dataset = Dataset.from_dict({
+                    "text": train_test_data.tolist(),
                 })
 
                 pred_dataset_all = Dataset.from_dict({
                     "text": pred_data.tolist()
                 })
 
-                tokenized_test_dataset_fine = test_dataset_500.map(
+                tokenized_get_score_dataset = get_score_dataset.map(
                     lambda x: tokenize_function(x, loaded_tokenizer),
                     batched=True
                 )
@@ -1028,14 +1023,27 @@ if 5:
                 inference_device = "cuda" if torch.cuda.is_available() else "cpu"
                 loaded_model = loaded_model.to(inference_device)
                 loaded_model.eval()
-                all_predictions= []
 
                 with torch.no_grad():
-                    outputs = loaded_model(**{k: v.to(loaded_model.device) for k, v in tokenized_pred_dataset.remove_columns(["text"]).items()})
-                    predictions = torch.softmax(outputs.logits, dim=-1)
-                    predicted_labels = torch.argmax(predictions, dim=-1)
+                    output_val = []
+                    for i in range(len(tokenized_get_score_dataset)):
+                        current_input = {k: torch.tensor(v).unsqueeze(0).to(inference_device) for k, v in tokenized_get_score_dataset[i].items()}
+                        outputs = model(**current_input)
+                        prediction_logits = torch.nn.functional.softmax(outputs.logits, dim=-1)
+                        prediction_class = torch.argmax(prediction_logits, dim=-1).item()
+                        output_val.append(prediction_class)
+                    
+                    print('val acc:',accuracy_score(train_test_label.tolist(),output_val))
 
-                    getConfMatrix(predicted_labels, train_test_label)
+                    output_pred = []
+                    for i in range(len(tokenized_pred_dataset_fine)):
+                        current_input = {k: torch.tensor(v).unsqueeze(0).to(inference_device) for k, v in tokenized_pred_dataset_fine[i].items()}
+                        outputs = model(**current_input)
+                        prediction_logits = torch.nn.functional.softmax(outputs.logits, dim=-1)
+                        prediction_class = torch.argmax(prediction_logits, dim=-1).item()
+                        output_pred.append(prediction_class)
+                    
+                    s = pd.Series(output_pred)
 
                 return
 
