@@ -2,10 +2,7 @@ import os
 
 if 1:
     ## for path compatibility, if you are not running from app.py, please specify the project root path as working directory (there is no __file__ in jupyter notebook)
-    _root_path_ = 'D:\\_work\\Bi-Senti-EE6483'
-
-    if '_root_path_' in locals():
-        os.chdir(_root_path_)
+    os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))) # change working directory to project root
     assert os.path.basename(os.getcwd()) == 'Bi-Senti-EE6483'
 
     import configparser as cp
@@ -55,9 +52,9 @@ if 1:
     #****************************************************************************************************
     # USER DEFINED HERE
     taskflows:list[F] = [
-        F.preset1,
+        F.ENSEMBLE_DISTILBERT,
         F.preset2,
-        F.ENSEMBLE_DISTILBERT
+        F.preset1,
     ]
     #****************************************************************************************************
 

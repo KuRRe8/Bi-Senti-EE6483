@@ -20,20 +20,27 @@ def run_jupyter():
     print("Start Jupyter...")
     subprocess.Popen(["start", "cmd", "/k", "jupyter", "notebook", os.path.join("src","jupyter","full.ipynb")], shell=True)
 
-def training():
-    print("Running Program 2...")
-    # Add your program 2 code here
-    subprocess.Popen(["start", "cmd", "/k", "python"], shell=True)
+def results():
+    choice = input("Show the result url press 1, show directly press 2: ")
+    if choice == '1':
+        print("submit\\out\\submission.csv")
+        time.sleep(3)
+    elif choice == '2':
+        csv_path = os.path.join("submit", "out", "submission.csv")
+        subprocess.Popen(["start", "cmd", "/k", "python", "-c", f"import pandas as pd; print(pd.read_csv('{csv_path}'))"], shell=True)
+    else:
+        print("Invalid choice. Please try again.")
+        time.sleep(2)
 
-def inference():
-    print("Running Program 3...")
-    # Add your program 3 code here
-    subprocess.Popen(["start", "cmd", "/k", "python program3.py"], shell=True)
+def gradio_frontend():
+    print("Opening Gradio...")
+    gr_path = os.path.join("src", "front", "gradio_front", "get_sentiment_box.py")
+    subprocess.Popen(["start", "cmd", "/k", f"python {gr_path}"], shell=True)
 
-def frontend():
-    print("Running Program 4...")
-    # Add your program 4 code here
-    subprocess.Popen(["start", "cmd", "/k", "python program4.py"], shell=True)
+def qt_frontend():
+    print("Opening Qt...")
+    qt_path = os.path.join("src", "front", "qt_front", "__main__.py")
+    subprocess.Popen(["start", "cmd", "/k", f"python {qt_path}"], shell=True)
 
 def main():
 
@@ -42,8 +49,8 @@ def main():
     while True:
         print("\nWelcome to the EE6483 group project reception:")
         print("1. Open ipynb file(providing an interactive manner to find out our thought process)")
-        print("2. Training routine(training the model, specified in config/runtime.ini)")
-        print("3. Inference routine(get the prediction result)")
+        print("2. Check for results from finetuned model(csv file)")
+        print("3. Frontend(gradio lightweight web UI)")
         print("4. Frontend(an Qt application to provide a user-friendly interface)")
         print("5. Exit")
         
@@ -52,11 +59,11 @@ def main():
         if choice == '1':
             run_jupyter()
         elif choice == '2':
-            training()
+            results()
         elif choice == '3':
-            inference()
+            gradio_frontend()
         elif choice == '4':
-            frontend()
+            qt_frontend()
         elif choice == '5':
             print("Thank you for using our program. See you next time!")
             break
