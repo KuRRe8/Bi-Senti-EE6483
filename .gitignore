@@ -167,6 +167,8 @@ cython_debug/
 .vscode/
 GoogleNews-vectors-negative300.bin
 checkpoint/
+!checkpoint/README.md
 **/optuna*/
 log/
+!log/.gitkeep
 cifar-10-python.tar.gz
