@@ -55,9 +55,9 @@ if 1:
     #****************************************************************************************************
     # USER DEFINED HERE
     taskflows:list[F] = [
-        F.ENSEMBLE_BERT,
-        #[F.ENSEMBLE_DISTILBERT],
-        F.preset1
+        F.preset1,
+        F.preset2,
+        F.ENSEMBLE_DISTILBERT
     ]
     #****************************************************************************************************
 
@@ -83,9 +83,6 @@ if 2:
     print("\nTest DataFrame info:")
     unlabeled_df.info()
 
-    labeled_df = labeled_df.head(3)
-    unlabeled_df = unlabeled_df.head(2)
-
     for i in range(len(container_traintest)):
         container_traintest[i].append(deepcopy(labeled_df))
         container_pred[i].append(deepcopy(unlabeled_df))
@@ -110,11 +107,8 @@ if 3:
         elif method == 'nltk':
             import nltk
             from nltk.tokenize import word_tokenize
-            nltk.download('punkt')
             return word_tokenize(text)
         elif method == 'spacy':
-            import spacy
-            nlp_en_model = spacy.load("en_core_web_sm")
             return [token.text for token in nlp_en_model(text)] #nlp_en_model(text) returns a generator（doc), yeilds tokens, token.text is the word, token.lemma_ is the lemma, token.pos_ is the POS
         elif method == 'gensim':
             import gensim
@@ -135,13 +129,9 @@ if 3:
         if method == 'nltk':
             import nltk
             from nltk.corpus import stopwords
-            nltk.download('stopwords')
-            nltk.download('punkt')
             stop_words = set(stopwords.words('english'))
             return [word for word in text if word not in stop_words]
         elif method == 'spacy':
-            import spacy
-            nlp_en_model = spacy.load("en_core_web_sm")
             stop_words = {word for word in nlp_en_model.Defaults.stop_words}
             return [word for word in text if word not in stop_words]
         elif method == 'gensim':
@@ -182,12 +172,10 @@ if 3:
                     else:       
                         lemmatized_sentence.append(lemmatizer.lemmatize(word, tag))
                 return lemmatized_sentence
-            nltk.download('wordnet')
+            
             lemmatizer = WordNetLemmatizer()
             return tagged_lemma(text)
         elif method == 'spacy':
-            import spacy
-            nlp_en_model = spacy.load("en_core_web_sm")
             return [token.lemma_ for token in nlp_en_model(" ".join(text))]
         elif method == 'textblob':
             from textblob import TextBlob
@@ -195,6 +183,20 @@ if 3:
             return [word.lemmatize() for word in blob.words]
         else:
             raise ValueError('method not supported')
+
+
+
+    #load the model gloablly
+    for taski in range(len(taskflows)):
+        if taskflows[taski] & F.TOKEN_NLTK or taskflows[taski] & F.STOPWORDS_NLTK or taskflows[taski] & F.LEMMATIZE_NKTK:
+            import nltk
+            from nltk.corpus import stopwords
+            nltk.download('punkt')
+            nltk.download('stopwords')
+            nltk.download('wordnet')
+        if taskflows[taski] & F.TOKEN_SPACY or taskflows[taski] & F.STOPWORDS_SPACY or taskflows[taski] & F.LEMMATIZE_SPACY:
+            import spacy
+            nlp_en_model = spacy.load("en_core_web_sm")
 
     for taski in range(len(taskflows)):
         if taskflows[taski] & F.RE:
@@ -929,6 +931,7 @@ if 5:
             from sklearn.model_selection import train_test_split
             import optuna
             import torch
+            from sklearn.metrics import accuracy_score
 
 
             def load_custom_dataset(train_data, train_label, pred_data):
@@ -996,6 +999,7 @@ if 5:
                 return eval_result["eval_accuracy"]
             
 
+            # If there exists a fine-tuned model, we will use it and instantly return no more training
             try_existing = os.path.join('checkpoint', FINETUNED, 'final_model')
             if os.path.exists(try_existing):
                 loaded_model = AutoModelForSequenceClassification.from_pretrained(try_existing)
@@ -1014,11 +1018,13 @@ if 5:
                     lambda x: tokenize_function(x, loaded_tokenizer),
                     batched=True
                 )
+                tokenized_get_score_dataset = tokenized_get_score_dataset.remove_columns(["text"])
 
                 tokenized_pred_dataset_fine = pred_dataset_all.map(
                     lambda x: tokenize_function(x, loaded_tokenizer),
                     batched=True
                 )
+                tokenized_pred_dataset_fine = tokenized_pred_dataset_fine.remove_columns(["text"])
                 
                 inference_device = "cuda" if torch.cuda.is_available() else "cpu"
                 loaded_model = loaded_model.to(inference_device)
@@ -1028,7 +1034,7 @@ if 5:
                     output_val = []
                     for i in range(len(tokenized_get_score_dataset)):
                         current_input = {k: torch.tensor(v).unsqueeze(0).to(inference_device) for k, v in tokenized_get_score_dataset[i].items()}
-                        outputs = model(**current_input)
+                        outputs = loaded_model(**current_input)
                         prediction_logits = torch.nn.functional.softmax(outputs.logits, dim=-1)
                         prediction_class = torch.argmax(prediction_logits, dim=-1).item()
                         output_val.append(prediction_class)
@@ -1038,14 +1044,14 @@ if 5:
                     output_pred = []
                     for i in range(len(tokenized_pred_dataset_fine)):
                         current_input = {k: torch.tensor(v).unsqueeze(0).to(inference_device) for k, v in tokenized_pred_dataset_fine[i].items()}
-                        outputs = model(**current_input)
+                        outputs = loaded_model(**current_input)
                         prediction_logits = torch.nn.functional.softmax(outputs.logits, dim=-1)
                         prediction_class = torch.argmax(prediction_logits, dim=-1).item()
                         output_pred.append(prediction_class)
                     
                     s = pd.Series(output_pred)
 
-                return
+                return s
 
             train_dataset, test_dataset, pred_dataset = load_custom_dataset(train_test_data, train_test_label, pred_data)
             tokenizer = AutoTokenizer.from_pretrained(PRETRAIN_HF_NAME)
@@ -1129,7 +1135,7 @@ if 5:
             result = model_train('SVM', train_test_data, train_test_label, pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'SVM.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'SVM.csv'), index=False)
         elif taskflows[taski] & F.MODEL_ELM:
             train_test_data = sum_up_embeddings(container_traintest[taski][-1])
             train_test_label = container_traintest[taski][0]['sentiment'].tolist()
@@ -1137,7 +1143,7 @@ if 5:
             result = model_train('ELM', train_test_data, train_test_label, pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'ELM.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'ELM.csv'), index=False)
         elif taskflows[taski] & F.MODEL_GP:
             train_test_data = sum_up_embeddings(container_traintest[taski][-1])
             train_test_label = container_traintest[taski][0]['sentiment'].tolist()
@@ -1145,7 +1151,7 @@ if 5:
             result = model_train('GaussianProcess', train_test_data, train_test_label, pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'GaussianProcess.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'GaussianProcess.csv'), index=False)
         elif taskflows[taski] & F.MODEL_RNN:
             pad_len = pad_to_length
             feature_size = len(container_traintest[taski][-1][0][0])
@@ -1163,7 +1169,7 @@ if 5:
             result = model_train('RNN', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'RNN.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'RNN.csv'), index=False)
         elif taskflows[taski] & F.MODEL_LSTM:
             pad_len = pad_to_length
             feature_size = len(container_traintest[taski][-1][0][0])
@@ -1181,7 +1187,7 @@ if 5:
             result = model_train('LSTM', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'LSTM.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'LSTM.csv'), index=False)
         elif taskflows[taski] & F.MODEL_GRU:
             pad_len = pad_to_length
             feature_size = len(container_traintest[taski][-1][0][0])
@@ -1199,26 +1205,26 @@ if 5:
             result = model_train('GRU', padded_train_test_data, container_traintest[taski][0]['sentiment'].tolist(), padded_pred_data)
             output: pd.DataFrame = container_pred[taski][0]
             output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'GRU.csv'), index=False)
+            output.to_csv(os.path.join('submit', 'GRU.csv'), index=False)
         
 # when fine-tuning, we pass through original data to huggingface api
         elif taskflows[taski] & F.ENSEMBLE_BERT:
-            result = model_train('BERT', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            result = model_train('BERT', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiments'], container_pred[taski][0]['reviews'])
             output: pd.DataFrame = container_pred[taski][0]
-            output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'BERT.csv'), index=False)
+            output['sentiments'] = result
+            output.to_csv(os.path.join('submit', 'BERT.csv'), index=False)
 
         elif taskflows[taski] & F.ENSEMBLE_DISTILBERT:
-            result = model_train('DistilBert', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            result = model_train('DistilBert', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiments'], container_pred[taski][0]['reviews'])
             output: pd.DataFrame = container_pred[taski][0]
-            output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'DistilBert.csv'), index=False)
+            output['sentiments'] = result
+            output.to_csv(os.path.join('submit', 'DistilBert.csv'), index=False)
 
         elif taskflows[taski] & F.ENSEMBLE_ROBERTA:
-            result = model_train('Roberta', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiment'], container_pred[taski][0]['reviews'])
+            result = model_train('Roberta', container_traintest[taski][0]['reviews'], container_traintest[taski][0]['sentiments'], container_pred[taski][0]['reviews'])
             output: pd.DataFrame = container_pred[taski][0]
-            output['sentiment'] = result
-            output.to_csv(os.path.join('submit', 'out', 'Roberta.csv'), index=False)
+            output['sentiments'] = result
+            output.to_csv(os.path.join('submit', 'Roberta.csv'), index=False)
 
         elif taskflows[taski] & F.CUSTOMIZED:
             container_traintest[taski].append(model_train('costumized', container_traintest[taski][0], container_pred[taski][0]))
